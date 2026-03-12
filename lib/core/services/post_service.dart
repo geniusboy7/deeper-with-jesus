@@ -129,6 +129,68 @@ class PostService {
   }
 
   // ---------------------------------------------------------------------------
+  // Likes (subcollection: posts/{postId}/likes)
+  // ---------------------------------------------------------------------------
+
+  /// Toggle a like for the given user. Returns `true` if the post is now liked.
+  Future<bool> toggleLike({
+    required String postId,
+    required String userId,
+  }) async {
+    final likeRef = _postsRef.doc(postId).collection('likes').doc(userId);
+    final postRef = _postsRef.doc(postId);
+
+    final likeSnap = await likeRef.get();
+
+    final batch = _firestore.batch();
+    if (likeSnap.exists) {
+      // Unlike
+      batch.delete(likeRef);
+      batch.update(postRef, {
+        'likesCount': FieldValue.increment(-1),
+        'likedBy': FieldValue.arrayRemove([userId]),
+      });
+      await batch.commit();
+      return false;
+    } else {
+      // Like
+      batch.set(likeRef, {
+        'userId': userId,
+        'createdAt': Timestamp.fromDate(DateTime.now()),
+      });
+      batch.update(postRef, {
+        'likesCount': FieldValue.increment(1),
+        'likedBy': FieldValue.arrayUnion([userId]),
+      });
+      await batch.commit();
+      return true;
+    }
+  }
+
+  /// Check if a user has liked a post.
+  Future<bool> hasUserLiked({
+    required String postId,
+    required String userId,
+  }) async {
+    final snap =
+        await _postsRef.doc(postId).collection('likes').doc(userId).get();
+    return snap.exists;
+  }
+
+  /// Stream whether a user has liked a post.
+  Stream<bool> watchUserLike({
+    required String postId,
+    required String userId,
+  }) {
+    return _postsRef
+        .doc(postId)
+        .collection('likes')
+        .doc(userId)
+        .snapshots()
+        .map((snap) => snap.exists);
+  }
+
+  // ---------------------------------------------------------------------------
   // Comments (subcollection: posts/{postId}/comments)
   // ---------------------------------------------------------------------------
 

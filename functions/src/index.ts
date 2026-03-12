@@ -174,7 +174,7 @@ export const sendCustomNotification = onCall(async (request) => {
 // ---------------------------------------------------------------------------
 export const autoPublishScheduledPosts = onSchedule(
   {
-    schedule: "every 1 minutes",
+    schedule: "every 30 minutes",
     timeoutSeconds: 60,
   },
   async () => {

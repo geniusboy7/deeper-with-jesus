@@ -20,7 +20,21 @@ service cloud.firestore {
     // ── Posts ───────────────────────────────────────────────────────────
     match /posts/{postId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow create, delete: if isAdmin();
+
+      // Admins can update anything; authenticated users can only update
+      // likesCount, commentsCount, and likedBy (for likes/comments).
+      allow update: if isAdmin()
+        || (isAuth()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['likesCount', 'commentsCount', 'likedBy']));
+
+      // ── Likes subcollection ────────────────────────────────────────
+      match /likes/{userId} {
+        allow read: if true;
+        allow create, delete: if isAuth() && request.auth.uid == userId;
+        allow update: if false;
+      }
 
       // ── Comments subcollection ─────────────────────────────────────
       match /comments/{commentId} {

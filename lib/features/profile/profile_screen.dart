@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../app.dart' show themeModeProvider;
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/notification_provider.dart';
 import '../auth/auth_prompt_sheet.dart';
@@ -18,7 +20,19 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  String _themeMode = 'System';
+  late String _themeMode;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sync local label with actual provider state
+    final mode = ref.read(themeModeProvider);
+    _themeMode = switch (mode) {
+      ThemeMode.light => 'Light',
+      ThemeMode.dark => 'Dark',
+      _ => 'System',
+    };
+  }
 
   String _initials(String displayName) {
     final parts = displayName.split(' ');
@@ -65,6 +79,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () {
                     setDialogState(() => tempTheme = option);
                     setState(() => _themeMode = option);
+
+                    // Actually apply the theme
+                    final mode = switch (option) {
+                      'Light' => ThemeMode.light,
+                      'Dark' => ThemeMode.dark,
+                      _ => ThemeMode.system,
+                    };
+                    ref.read(themeModeProvider.notifier).set(mode);
+
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -384,7 +407,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               size: 16,
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-            onTap: () => _showSnackBar('Opening Instagram...'),
+            onTap: () => launchUrl(Uri.parse('https://www.instagram.com/deeper_with_jesus/'), mode: LaunchMode.externalApplication),
           ),
 
           ListTile(
@@ -403,7 +426,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               size: 16,
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-            onTap: () => _showSnackBar('Opening support...'),
+            onTap: () => launchUrl(Uri.parse('https://www.instagram.com/deeper_with_jesus/'), mode: LaunchMode.externalApplication),
           ),
 
           ListTile(
@@ -422,7 +445,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               size: 16,
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-            onTap: () => _showSnackBar('Opening privacy policy...'),
+            onTap: () => launchUrl(Uri.parse('https://www.geniustechhub.com/privacy-policy'), mode: LaunchMode.externalApplication),
           ),
 
           // Admin section (conditional — real user role)

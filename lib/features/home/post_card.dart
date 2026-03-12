@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/templates.dart';
 import '../../core/models/devotional_post.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/post_provider.dart';
 import '../../shared/widgets/template_background.dart';
 import '../auth/auth_prompt_sheet.dart';
 
@@ -52,23 +53,42 @@ class PostCard extends ConsumerStatefulWidget {
 class _PostCardState extends ConsumerState<PostCard> {
   bool _isLiked = false;
   late int _likeCount;
+  bool _isLiking = false;
 
   @override
   void initState() {
     super.initState();
     _likeCount = widget.post?.likesCount ?? 0;
+    _checkInitialLikeState();
   }
 
   @override
   void didUpdateWidget(PostCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.post?.id != widget.post?.id) {
-      _isLiked = false;
+      _likeCount = widget.post?.likesCount ?? 0;
+      _checkInitialLikeState();
+    } else {
+      // Update count from Firestore but keep local like state
       _likeCount = widget.post?.likesCount ?? 0;
     }
   }
 
-  void _toggleLike() {
+  Future<void> _checkInitialLikeState() async {
+    final firebaseUser = ref.read(firebaseAuthStateProvider).value;
+    final post = widget.post;
+    if (firebaseUser == null || post == null) {
+      _isLiked = false;
+      return;
+    }
+    final liked = await ref.read(postServiceProvider).hasUserLiked(
+          postId: post.id,
+          userId: firebaseUser.uid,
+        );
+    if (mounted) setState(() => _isLiked = liked);
+  }
+
+  Future<void> _toggleLike() async {
     // Auth guard: guests must sign in before liking
     final firebaseUser = ref.read(firebaseAuthStateProvider).value;
     if (firebaseUser == null) {
@@ -76,10 +96,32 @@ class _PostCardState extends ConsumerState<PostCard> {
       return;
     }
 
+    final post = widget.post;
+    if (post == null || _isLiking) return;
+
+    // Optimistic UI update
     setState(() {
+      _isLiking = true;
       _isLiked = !_isLiked;
       _likeCount += _isLiked ? 1 : -1;
     });
+
+    try {
+      await ref.read(postServiceProvider).toggleLike(
+            postId: post.id,
+            userId: firebaseUser.uid,
+          );
+    } catch (e) {
+      // Revert on error
+      if (mounted) {
+        setState(() {
+          _isLiked = !_isLiked;
+          _likeCount += _isLiked ? 1 : -1;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLiking = false);
+    }
   }
 
   void _showShareSnackbar() {
