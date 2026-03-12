@@ -75,8 +75,24 @@ class _CommentSheetState extends ConsumerState<CommentSheet> {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
+    // Enforce maximum comment length
+    if (text.length > 500) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Comment is too long (max 500 characters)')),
+      );
+      return;
+    }
+
     final appUser = ref.read(appUserProvider).value;
     if (appUser == null) return;
+
+    // Prevent banned users from commenting
+    if (appUser.isBanned) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your account has been suspended')),
+      );
+      return;
+    }
 
     setState(() => _isSending = true);
 
@@ -309,6 +325,9 @@ class _CommentSheetState extends ConsumerState<CommentSheet> {
           Expanded(
             child: TextField(
               controller: _textController,
+              maxLength: 500,
+              maxLines: null,
+              buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
               style: GoogleFonts.raleway(
                 fontSize: 15,
                 color: AppColors.textPrimary(context),

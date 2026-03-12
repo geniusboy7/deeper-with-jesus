@@ -34,21 +34,23 @@ class DevotionalPost {
   factory DevotionalPost.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
-    final data = doc.data()!;
+    final data = doc.data() ?? {};
     return DevotionalPost(
       id: doc.id,
       imageUrl: data['imageUrl'] as String?,
       templateId: data['templateId'] as String?,
       textContent: data['textContent'] as String?,
       caption: data['caption'] as String?,
-      scheduledFor: (data['scheduledFor'] as Timestamp).toDate(),
+      scheduledFor: data['scheduledFor'] is Timestamp
+          ? (data['scheduledFor'] as Timestamp).toDate()
+          : DateTime.now(),
       isPublished: data['isPublished'] as bool? ?? false,
       topicIds: List<String>.from(data['topicIds'] ?? []),
       type: data['type'] as String? ?? 'uploaded',
       likesCount: data['likesCount'] as int? ?? 0,
       commentsCount: data['commentsCount'] as int? ?? 0,
       viewsCount: data['viewsCount'] as int? ?? 0,
-      updatedAt: data['updatedAt'] != null
+      updatedAt: data['updatedAt'] is Timestamp
           ? (data['updatedAt'] as Timestamp).toDate()
           : null,
     );
@@ -124,14 +126,16 @@ class Comment {
   factory Comment.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
-    final data = doc.data()!;
+    final data = doc.data() ?? {};
     return Comment(
       id: doc.id,
       userId: data['userId'] as String? ?? '',
       displayName: data['displayName'] as String? ?? 'User',
       photoUrl: data['photoUrl'] as String?,
       text: data['text'] as String? ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: data['createdAt'] is Timestamp
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
     );
   }
 
@@ -154,7 +158,6 @@ class AppUser {
   final String role; // 'user' or 'admin'
   final bool notificationsEnabled;
   final bool isBanned;
-  final List<String> fcmTokens;
   final int appOpens;
 
   const AppUser({
@@ -165,7 +168,6 @@ class AppUser {
     this.role = 'user',
     this.notificationsEnabled = true,
     this.isBanned = false,
-    this.fcmTokens = const [],
     this.appOpens = 0,
   });
 
@@ -180,7 +182,6 @@ class AppUser {
       role: data['role'] as String? ?? 'user',
       notificationsEnabled: data['notificationsEnabled'] as bool? ?? true,
       isBanned: data['isBanned'] as bool? ?? false,
-      fcmTokens: List<String>.from(data['fcmTokens'] ?? []),
       appOpens: data['appOpens'] as int? ?? 0,
     );
   }
@@ -193,7 +194,6 @@ class AppUser {
       'role': role,
       'notificationsEnabled': notificationsEnabled,
       'isBanned': isBanned,
-      'fcmTokens': fcmTokens,
       'appOpens': appOpens,
     };
   }
@@ -206,7 +206,6 @@ class AppUser {
     String? role,
     bool? notificationsEnabled,
     bool? isBanned,
-    List<String>? fcmTokens,
     int? appOpens,
   }) {
     return AppUser(
@@ -217,7 +216,6 @@ class AppUser {
       role: role ?? this.role,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       isBanned: isBanned ?? this.isBanned,
-      fcmTokens: fcmTokens ?? this.fcmTokens,
       appOpens: appOpens ?? this.appOpens,
     );
   }

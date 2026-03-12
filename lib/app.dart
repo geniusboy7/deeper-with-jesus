@@ -172,7 +172,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/editor',
         builder: (context, state) {
-          final template = state.extra as TemplateData? ?? Templates.all.first;
+          final template = state.extra is TemplateData
+              ? state.extra as TemplateData
+              : Templates.all.first;
           return TextEditorScreen(template: template);
         },
       ),
@@ -199,6 +201,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Deep link route for notification taps
       GoRoute(
         path: '/post/:postId',
+        redirect: (context, state) {
+          // Validate postId — Firestore document IDs are 1-128 chars,
+          // alphanumeric + underscores/hyphens only.
+          final postId = state.pathParameters['postId'] ?? '';
+          final validId = RegExp(r'^[a-zA-Z0-9_-]{1,128}$');
+          if (!validId.hasMatch(postId)) return '/home';
+
+          // Validate optional date query parameter if present
+          final dateStr = state.uri.queryParameters['date'];
+          if (dateStr != null && DateTime.tryParse(dateStr) == null) {
+            return '/home';
+          }
+
+          return null; // pass through
+        },
         builder: (context, state) {
           final dateStr = state.uri.queryParameters['date'];
           final date = dateStr != null

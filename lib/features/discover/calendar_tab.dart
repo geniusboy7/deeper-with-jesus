@@ -50,7 +50,7 @@ class _CalendarTabState extends ConsumerState<CalendarTab> {
     final allPosts = postsAsync.value ?? [];
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Card(
         color: AppColors.surface(context),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

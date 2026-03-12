@@ -24,11 +24,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const int _initialPage = 10000;
   late final PageController _pageController;
   late int _currentPage;
-  final DateTime _today = DateUtils.dateOnly(DateTime.now());
+  late final DateTime _anchorDate;
+
+  /// Always use a fresh "today" so stale references after midnight are avoided.
+  DateTime get _today => DateUtils.dateOnly(DateTime.now());
 
   @override
   void initState() {
     super.initState();
+    _anchorDate = DateUtils.dateOnly(DateTime.now());
     _currentPage = _initialPage;
     _pageController = PageController(initialPage: _initialPage);
   }
@@ -39,13 +43,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  /// Convert a page index to a date. _initialPage = today.
+  /// Convert a page index to a date. _initialPage = anchor date (today at init).
   DateTime _dateForPage(int page) {
     final offset = page - _initialPage;
-    return _today.add(Duration(days: offset));
+    return _anchorDate.add(Duration(days: offset));
   }
 
-  /// How far into the future the user can swipe (1 day max).
+  /// How far into the future the user can swipe (1 day max from real today).
   bool _canSwipeToPage(int page) {
     final date = _dateForPage(page);
     final maxDate = _today.add(const Duration(days: 1));
@@ -83,16 +87,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Expanded(
             child: PageView.builder(
               controller: _pageController,
+              // Cap at tomorrow (initialPage + 1) so the user can't swipe further
+              itemCount: _initialPage + 2,
               onPageChanged: (page) {
-                // Prevent swiping beyond tomorrow
-                if (!_canSwipeToPage(page)) {
-                  _pageController.animateToPage(
-                    _currentPage,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                  return;
-                }
                 setState(() => _currentPage = page);
               },
               itemBuilder: (context, index) {
@@ -118,7 +115,7 @@ class _PostPageForDate extends ConsumerWidget {
     // Show patience card for tomorrow (future dates)
     final today = DateUtils.dateOnly(DateTime.now());
     if (date.isAfter(today)) {
-      return _PatienceCard(date: date);
+      return PatienceCard(date: date);
     }
 
     final postAsync = ref.watch(postForDateProvider(date));
@@ -199,10 +196,10 @@ const List<Map<String, String>> _patienceVerses = [
 
 const List<String> _patienceEmojis = ['😊', '🤗', '🫣', '🫶', '🙏', '👀'];
 
-class _PatienceCard extends StatelessWidget {
+class PatienceCard extends StatelessWidget {
   final DateTime date;
 
-  const _PatienceCard({required this.date});
+  const PatienceCard({super.key, required this.date});
 
   @override
   Widget build(BuildContext context) {

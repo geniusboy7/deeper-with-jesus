@@ -27,6 +27,10 @@ class NotificationService {
     // Set up local notifications for foreground display
     await _initLocalNotifications();
 
+    // On iOS, the APNs token must be available before getToken() or
+    // topic subscriptions will silently fail. Wait for it (with timeout).
+    await _waitForApnsToken();
+
     // Get and store FCM token
     final token = await _messaging.getToken();
     if (token != null) {
@@ -52,6 +56,19 @@ class NotificationService {
         _handleNotificationTap(initialMessage);
       });
     }
+  }
+
+  /// On iOS, APNs token delivery is async. FCM's getToken() and topic
+  /// subscriptions silently fail without it. Poll briefly until it arrives.
+  Future<void> _waitForApnsToken() async {
+    // Only relevant on iOS — Android doesn't use APNs.
+    for (int i = 0; i < 10; i++) {
+      final apnsToken = await _messaging.getAPNSToken();
+      if (apnsToken != null) return;
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    // If we still don't have one after 5s, continue anyway — the
+    // onTokenRefresh listener will pick it up later.
   }
 
   /// Attach the GoRouter instance for deep linking from notification taps.
@@ -91,11 +108,16 @@ class NotificationService {
 
   Future<void> _storeFcmToken(String userId, String token) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
-        'fcmTokens': FieldValue.arrayUnion([token]),
+      // Store in a separate server-managed collection keyed by token.
+      // This keeps FCM tokens out of the user document (which the user
+      // can read) and lets Cloud Functions query tokens independently.
+      await _firestore.collection('fcm_tokens').doc(token).set({
+        'userId': userId,
+        'token': token,
+        'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (_) {
-      // User doc might not exist yet — ignore silently
+      // Collection or permissions might not be ready yet — ignore silently
     }
   }
 
@@ -104,9 +126,7 @@ class NotificationService {
     try {
       final token = await _messaging.getToken();
       if (token != null) {
-        await _firestore.collection('users').doc(userId).update({
-          'fcmTokens': FieldValue.arrayRemove([token]),
-        });
+        await _firestore.collection('fcm_tokens').doc(token).delete();
       }
     } catch (_) {}
   }
@@ -134,9 +154,11 @@ class NotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
-        // Handle tap on local notification
+        // Handle tap on local notification — validate postId format
         final payload = response.payload;
-        if (payload != null && _router != null) {
+        if (payload != null &&
+            _router != null &&
+            _validPostId.hasMatch(payload)) {
           _router!.push('/post/$payload');
         }
       },
@@ -228,15 +250,21 @@ class NotificationService {
   // Notification tap → deep link
   // ---------------------------------------------------------------------------
 
+  /// Firestore doc IDs: 1-128 chars, alphanumeric + underscores/hyphens.
+  static final _validPostId = RegExp(r'^[a-zA-Z0-9_-]{1,128}$');
+
   void _handleNotificationTap(RemoteMessage message) {
     if (_router == null) return;
 
     final postId = message.data['postId'] as String?;
-    final dateStr = message.data['scheduledFor'] as String?;
+    if (postId == null || !_validPostId.hasMatch(postId)) return;
 
-    if (postId != null) {
-      final query = dateStr != null ? '?date=$dateStr' : '';
-      _router!.push('/post/$postId$query');
-    }
+    final dateStr = message.data['scheduledFor'] as String?;
+    // Only append date if it parses to a valid DateTime
+    final query =
+        (dateStr != null && DateTime.tryParse(dateStr) != null)
+            ? '?date=$dateStr'
+            : '';
+    _router!.push('/post/$postId$query');
   }
 }

@@ -35,11 +35,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   String _initials(String displayName) {
+    if (displayName.isEmpty) return '?';
     final parts = displayName.split(' ');
-    if (parts.length >= 2) {
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
-    return displayName.substring(0, 1).toUpperCase();
+    return displayName[0].toUpperCase();
   }
 
   void _showThemeDialog() {
@@ -176,16 +177,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (confirmed != true || !mounted) return;
 
     try {
-      // Delete Firestore user document
       final userService = ref.read(userServiceProvider);
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
-        await userService.deleteUser(firebaseUser.uid);
-        // Delete the Firebase Auth account
+        // Delete the Firebase Auth account first — this can throw
+        // requires-recent-login before any data is lost.
         await firebaseUser.delete();
+        // Only delete Firestore data after auth deletion succeeds.
+        await userService.deleteUser(firebaseUser.uid);
       }
       // Sign out (clears Google session etc.)
       await signOut(ref);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login' && mounted) {
+        _showSnackBar(
+          'Please sign out and sign back in, then try deleting your account again.',
+        );
+      } else if (mounted) {
+        _showSnackBar('Failed to delete account. Please try again.');
+      }
     } catch (e) {
       if (mounted) {
         _showSnackBar('Failed to delete account. Please try again.');
@@ -204,7 +214,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Profile',
+          'You',
           style: GoogleFonts.lora(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -212,11 +222,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
       body: ListView(
-        padding: EdgeInsets.only(
+        padding: const EdgeInsets.only(
           left: 16,
           right: 16,
-          // Extra bottom padding so content clears the glass navbar on iOS
-          bottom: MediaQuery.of(context).viewPadding.bottom + 80,
+          bottom: 32,
         ),
         children: [
           const SizedBox(height: 24),

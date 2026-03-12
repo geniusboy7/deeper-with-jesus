@@ -75,6 +75,10 @@
 		<string>https</string>
 		<string>http</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to let you upload images for devotional posts.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to your camera to let you take photos for devotional posts.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

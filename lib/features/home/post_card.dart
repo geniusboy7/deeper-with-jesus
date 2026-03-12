@@ -346,7 +346,9 @@ class _PostCardState extends ConsumerState<PostCard> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              '#${topic[0].toUpperCase()}${topic.substring(1)}',
+                              topic.isNotEmpty
+                                  ? '#${topic[0].toUpperCase()}${topic.substring(1)}'
+                                  : '#',
                               style: GoogleFonts.raleway(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500,

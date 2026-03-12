@@ -56,13 +56,27 @@ class HasSeenOnboardingNotifier extends Notifier<bool> {
 // -----------------------------------------------------------------------------
 
 /// The full AppUser document from Firestore. Null when not signed in.
+/// Automatically signs out banned users.
 final appUserProvider = StreamProvider<AppUser?>((ref) {
   final authState = ref.watch(firebaseAuthStateProvider);
 
   return authState.when(
     data: (firebaseUser) {
       if (firebaseUser == null) return Stream.value(null);
-      return ref.watch(userServiceProvider).watchUser(firebaseUser.uid);
+      return ref
+          .watch(userServiceProvider)
+          .watchUser(firebaseUser.uid)
+          .map((appUser) {
+        if (appUser != null && appUser.isBanned) {
+          // Force sign-out for banned users on next microtask to avoid
+          // modifying providers during build.
+          Future.microtask(() {
+            ref.read(authServiceProvider).signOut();
+          });
+          return null;
+        }
+        return appUser;
+      });
     },
     loading: () => Stream.value(null),
     error: (_, _) => Stream.value(null),
@@ -79,7 +93,11 @@ Future<AppUser> signInWithGoogle(WidgetRef ref) async {
   final userService = ref.read(userServiceProvider);
 
   final credential = await authService.signInWithGoogle();
-  final appUser = await userService.getOrCreateUser(credential.user!);
+  final user = credential.user;
+  if (user == null) {
+    throw Exception('Google sign-in succeeded but no user was returned.');
+  }
+  final appUser = await userService.getOrCreateUser(user);
 
   ref.read(isGuestProvider.notifier).set(false);
   return appUser;
@@ -91,7 +109,11 @@ Future<AppUser> signInWithApple(WidgetRef ref) async {
   final userService = ref.read(userServiceProvider);
 
   final credential = await authService.signInWithApple();
-  final appUser = await userService.getOrCreateUser(credential.user!);
+  final user = credential.user;
+  if (user == null) {
+    throw Exception('Apple sign-in succeeded but no user was returned.');
+  }
+  final appUser = await userService.getOrCreateUser(user);
 
   ref.read(isGuestProvider.notifier).set(false);
   return appUser;

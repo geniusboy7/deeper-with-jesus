@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/providers/post_provider.dart';
+import 'home_screen.dart' show PatienceCard;
 import 'post_card.dart';
 import 'comment_sheet.dart';
 
@@ -149,19 +150,18 @@ class _PostViewerScreenState extends ConsumerState<PostViewerScreen> {
             ),
           ),
 
-          // Swipeable post cards
+          // Swipeable post cards — capped at tomorrow
           Expanded(
             child: PageView.builder(
               controller: _pageController,
+              // How many pages forward from anchor to tomorrow, then cap there
+              itemCount: _centerPage +
+                  DateUtils.dateOnly(DateTime.now())
+                      .add(const Duration(days: 1))
+                      .difference(_anchorDate)
+                      .inDays +
+                  1,
               onPageChanged: (page) {
-                if (!_canSwipeToPage(page)) {
-                  _pageController.animateToPage(
-                    _currentPage,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                  return;
-                }
                 setState(() => _currentPage = page);
               },
               itemBuilder: (context, index) {
@@ -184,6 +184,12 @@ class _ViewerPostPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Show patience card for future dates (tomorrow)
+    final today = DateUtils.dateOnly(DateTime.now());
+    if (date.isAfter(today)) {
+      return PatienceCard(date: date);
+    }
+
     final postAsync = ref.watch(postForDateProvider(date));
 
     return postAsync.when(
