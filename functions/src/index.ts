@@ -4,6 +4,7 @@ import {
   onDocumentCreated,
 } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 admin.initializeApp();
 
@@ -166,3 +167,39 @@ export const sendCustomNotification = onCall(async (request) => {
   console.log(`Custom notification sent by ${callerEmail}: "${title}"`);
   return { success: true };
 });
+
+// ---------------------------------------------------------------------------
+// 4. autoPublishScheduledPosts — Runs every minute, publishes posts whose
+//    scheduledFor time has passed and isPublished is still false.
+// ---------------------------------------------------------------------------
+export const autoPublishScheduledPosts = onSchedule(
+  {
+    schedule: "every 1 minutes",
+    timeoutSeconds: 60,
+  },
+  async () => {
+    const now = admin.firestore.Timestamp.now();
+
+    const snapshot = await db
+      .collection("posts")
+      .where("isPublished", "==", false)
+      .where("scheduledFor", "<=", now)
+      .get();
+
+    if (snapshot.empty) {
+      console.log("No posts to auto-publish.");
+      return;
+    }
+
+    const batch = db.batch();
+    for (const doc of snapshot.docs) {
+      batch.update(doc.ref, {
+        isPublished: true,
+        updatedAt: now,
+      });
+    }
+    await batch.commit();
+
+    console.log(`Auto-published ${snapshot.size} post(s).`);
+  }
+);
