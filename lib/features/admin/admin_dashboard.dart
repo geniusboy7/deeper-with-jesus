@@ -11,6 +11,7 @@ import '../../core/models/devotional_post.dart';
 import '../../core/providers/post_provider.dart';
 import '../../shared/widgets/template_background.dart';
 import 'create_post_screen.dart';
+import 'schedule_picker.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
   const AdminDashboard({super.key});
@@ -432,7 +433,7 @@ class _QuickActionButton extends StatelessWidget {
 
 // ── Post Card ───────────────────────────────────────────────────────────────
 
-class _PostCard extends StatelessWidget {
+class _PostCard extends ConsumerWidget {
   final DevotionalPost post;
 
   const _PostCard({required this.post});
@@ -446,83 +447,202 @@ class _PostCard extends StatelessWidget {
     }
   }
 
+  void _showPostActions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              decoration: BoxDecoration(
+                color: AppColors.textSecondary(context).withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Icon(LucideIcons.edit3, color: AppColors.primary(context)),
+              title: Text('Edit Post', style: GoogleFonts.raleway(fontWeight: FontWeight.w500)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SchedulePicker(
+                      existingPost: post,
+                      imageUrl: post.type == 'uploaded' ? post.imageUrl : null,
+                      template: _getTemplate(),
+                      textContent: post.textContent ?? '',
+                      caption: post.caption ?? '',
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (!post.isPublished)
+              ListTile(
+                leading: const Icon(LucideIcons.send, color: Color(0xFF10B981)),
+                title: Text('Publish Now', style: GoogleFonts.raleway(fontWeight: FontWeight.w500)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final postService = ref.read(postServiceProvider);
+                  await postService.publishPost(post.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Post published!', style: GoogleFonts.raleway()),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFF10B981),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ListTile(
+              leading: const Icon(LucideIcons.trash2, color: Color(0xFFEF4444)),
+              title: Text('Delete Post', style: GoogleFonts.raleway(fontWeight: FontWeight.w500, color: const Color(0xFFEF4444))),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDelete(context, ref);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Post?', style: GoogleFonts.lora(fontWeight: FontWeight.w600)),
+        content: Text(
+          'This action cannot be undone. All likes, comments, and views will be lost.',
+          style: GoogleFonts.raleway(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.raleway(color: AppColors.textSecondary(context))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final postService = ref.read(postServiceProvider);
+              await postService.deletePost(post.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Post deleted', style: GoogleFonts.raleway()),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: const Color(0xFFEF4444),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            child: Text('Delete', style: GoogleFonts.raleway(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final template = _getTemplate();
     final dateStr = DateFormat('MMM d, yyyy').format(post.scheduledFor);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: _buildThumbnail(context, template),
-            ),
-            const SizedBox(width: 12),
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          post.textContent ?? post.caption ?? 'Untitled',
-                          style: GoogleFonts.lora(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary(context),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _StatusBadge(isPublished: post.isPublished),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    dateStr,
-                    style: GoogleFonts.raleway(
-                      fontSize: 13,
-                      color: AppColors.textSecondary(context),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Stats row
-                  Row(
-                    children: [
-                      _StatChip(
-                        icon: LucideIcons.eye,
-                        count: post.viewsCount,
-                        context: context,
-                      ),
-                      const SizedBox(width: 16),
-                      _StatChip(
-                        icon: LucideIcons.heart,
-                        count: post.likesCount,
-                        context: context,
-                      ),
-                      const SizedBox(width: 16),
-                      _StatChip(
-                        icon: LucideIcons.messageCircle,
-                        count: post.commentsCount,
-                        context: context,
-                      ),
-                    ],
-                  ),
-                ],
+    return GestureDetector(
+      onTap: () => _showPostActions(context, ref),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Thumbnail
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _buildThumbnail(context, template),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            post.textContent ?? post.caption ?? 'Untitled',
+                            style: GoogleFonts.lora(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary(context),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _StatusBadge(isPublished: post.isPublished),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      dateStr,
+                      style: GoogleFonts.raleway(
+                        fontSize: 13,
+                        color: AppColors.textSecondary(context),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Stats row
+                    Row(
+                      children: [
+                        _StatChip(
+                          icon: LucideIcons.eye,
+                          count: post.viewsCount,
+                          context: context,
+                        ),
+                        const SizedBox(width: 16),
+                        _StatChip(
+                          icon: LucideIcons.heart,
+                          count: post.likesCount,
+                          context: context,
+                        ),
+                        const SizedBox(width: 16),
+                        _StatChip(
+                          icon: LucideIcons.messageCircle,
+                          count: post.commentsCount,
+                          context: context,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Edit icon hint
+              Icon(
+                LucideIcons.moreVertical,
+                size: 18,
+                color: AppColors.textSecondary(context),
+              ),
+            ],
+          ),
         ),
       ),
     );

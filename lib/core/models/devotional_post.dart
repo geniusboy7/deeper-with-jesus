@@ -13,6 +13,7 @@ class DevotionalPost {
   final int likesCount;
   final int commentsCount;
   final int viewsCount;
+  final DateTime? updatedAt;
 
   const DevotionalPost({
     required this.id,
@@ -27,6 +28,7 @@ class DevotionalPost {
     this.likesCount = 0,
     this.commentsCount = 0,
     this.viewsCount = 0,
+    this.updatedAt,
   });
 
   factory DevotionalPost.fromFirestore(
@@ -46,6 +48,9 @@ class DevotionalPost {
       likesCount: data['likesCount'] as int? ?? 0,
       commentsCount: data['commentsCount'] as int? ?? 0,
       viewsCount: data['viewsCount'] as int? ?? 0,
+      updatedAt: data['updatedAt'] != null
+          ? (data['updatedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -62,6 +67,7 @@ class DevotionalPost {
       'likesCount': likesCount,
       'commentsCount': commentsCount,
       'viewsCount': viewsCount,
+      if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
     };
   }
 
@@ -78,6 +84,7 @@ class DevotionalPost {
     int? likesCount,
     int? commentsCount,
     int? viewsCount,
+    DateTime? updatedAt,
   }) {
     return DevotionalPost(
       id: id ?? this.id,
@@ -92,6 +99,7 @@ class DevotionalPost {
       likesCount: likesCount ?? this.likesCount,
       commentsCount: commentsCount ?? this.commentsCount,
       viewsCount: viewsCount ?? this.viewsCount,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

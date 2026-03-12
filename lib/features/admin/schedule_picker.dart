@@ -15,6 +15,7 @@ class SchedulePicker extends ConsumerStatefulWidget {
   final String textContent;
   final String caption;
   final String? imageUrl; // For uploaded image posts
+  final DevotionalPost? existingPost; // Non-null when editing
 
   const SchedulePicker({
     super.key,
@@ -22,7 +23,10 @@ class SchedulePicker extends ConsumerStatefulWidget {
     this.textContent = '',
     this.caption = '',
     this.imageUrl,
+    this.existingPost,
   });
+
+  bool get isEditing => existingPost != null;
 
   @override
   ConsumerState<SchedulePicker> createState() => _SchedulePickerState();
@@ -38,9 +42,20 @@ class _SchedulePickerState extends ConsumerState<SchedulePicker> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now().add(const Duration(days: 1));
-    _selectedTime = const TimeOfDay(hour: 9, minute: 0);
-    _captionController = TextEditingController(text: widget.caption);
+    final existing = widget.existingPost;
+    if (existing != null) {
+      _selectedDate = existing.scheduledFor;
+      _selectedTime = TimeOfDay(
+        hour: existing.scheduledFor.hour,
+        minute: existing.scheduledFor.minute,
+      );
+      _selectedTopicIds.addAll(existing.topicIds);
+      _captionController = TextEditingController(text: existing.caption ?? '');
+    } else {
+      _selectedDate = DateTime.now().add(const Duration(days: 1));
+      _selectedTime = const TimeOfDay(hour: 9, minute: 0);
+      _captionController = TextEditingController(text: widget.caption);
+    }
   }
 
   @override
@@ -53,7 +68,9 @@ class _SchedulePickerState extends ConsumerState<SchedulePicker> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now(),
+      firstDate: widget.isEditing
+          ? DateTime(2020)
+          : DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
@@ -108,28 +125,45 @@ class _SchedulePickerState extends ConsumerState<SchedulePicker> {
     try {
       final postService = ref.read(postServiceProvider);
       final scheduledFor = _combineDateAndTime();
+      final existing = widget.existingPost;
 
-      final post = DevotionalPost(
-        id: '', // Firestore will auto-generate
-        imageUrl: widget.imageUrl,
-        templateId: widget.template?.id,
-        textContent: widget.textContent.isNotEmpty ? widget.textContent : null,
-        caption: _captionController.text.isNotEmpty
-            ? _captionController.text
-            : null,
-        scheduledFor: scheduledFor,
-        isPublished: false, // Scheduled, not published yet
-        topicIds: _selectedTopicIds.toList(),
-        type: widget.imageUrl != null ? 'uploaded' : 'template',
-      );
-
-      await postService.createPost(post);
+      if (existing != null) {
+        // Editing an existing post
+        final updated = existing.copyWith(
+          caption: _captionController.text.isNotEmpty
+              ? _captionController.text
+              : null,
+          scheduledFor: scheduledFor,
+          isPublished: false,
+          topicIds: _selectedTopicIds.toList(),
+        );
+        await postService.updatePost(updated);
+      } else {
+        // Creating a new post
+        final post = DevotionalPost(
+          id: '',
+          imageUrl: widget.imageUrl,
+          templateId: widget.template?.id,
+          textContent:
+              widget.textContent.isNotEmpty ? widget.textContent : null,
+          caption: _captionController.text.isNotEmpty
+              ? _captionController.text
+              : null,
+          scheduledFor: scheduledFor,
+          isPublished: false,
+          topicIds: _selectedTopicIds.toList(),
+          type: widget.imageUrl != null ? 'uploaded' : 'template',
+        );
+        await postService.createPost(post);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Post scheduled for ${DateFormat('MMM d, yyyy').format(_selectedDate)} at ${_selectedTime.format(context)}',
+              existing != null
+                  ? 'Post updated and scheduled for ${DateFormat('MMM d, yyyy').format(_selectedDate)} at ${_selectedTime.format(context)}'
+                  : 'Post scheduled for ${DateFormat('MMM d, yyyy').format(_selectedDate)} at ${_selectedTime.format(context)}',
               style: GoogleFonts.raleway(),
             ),
             behavior: SnackBarBehavior.floating,
@@ -165,28 +199,45 @@ class _SchedulePickerState extends ConsumerState<SchedulePicker> {
 
     try {
       final postService = ref.read(postServiceProvider);
+      final existing = widget.existingPost;
 
-      final post = DevotionalPost(
-        id: '',
-        imageUrl: widget.imageUrl,
-        templateId: widget.template?.id,
-        textContent: widget.textContent.isNotEmpty ? widget.textContent : null,
-        caption: _captionController.text.isNotEmpty
-            ? _captionController.text
-            : null,
-        scheduledFor: DateTime.now(),
-        isPublished: true, // Published immediately
-        topicIds: _selectedTopicIds.toList(),
-        type: widget.imageUrl != null ? 'uploaded' : 'template',
-      );
-
-      await postService.createPost(post);
+      if (existing != null) {
+        // Editing: update and publish
+        final updated = existing.copyWith(
+          caption: _captionController.text.isNotEmpty
+              ? _captionController.text
+              : null,
+          scheduledFor: _combineDateAndTime(),
+          isPublished: true,
+          topicIds: _selectedTopicIds.toList(),
+        );
+        await postService.updatePost(updated);
+      } else {
+        // Creating new and publishing
+        final post = DevotionalPost(
+          id: '',
+          imageUrl: widget.imageUrl,
+          templateId: widget.template?.id,
+          textContent:
+              widget.textContent.isNotEmpty ? widget.textContent : null,
+          caption: _captionController.text.isNotEmpty
+              ? _captionController.text
+              : null,
+          scheduledFor: DateTime.now(),
+          isPublished: true,
+          topicIds: _selectedTopicIds.toList(),
+          type: widget.imageUrl != null ? 'uploaded' : 'template',
+        );
+        await postService.createPost(post);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Post published successfully!',
+              existing != null
+                  ? 'Post updated and published!'
+                  : 'Post published successfully!',
               style: GoogleFonts.raleway(),
             ),
             behavior: SnackBarBehavior.floating,
@@ -221,7 +272,7 @@ class _SchedulePickerState extends ConsumerState<SchedulePicker> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Schedule Post',
+          widget.isEditing ? 'Edit Post' : 'Schedule Post',
           style: GoogleFonts.lora(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -449,7 +500,7 @@ class _SchedulePickerState extends ConsumerState<SchedulePicker> {
                         ),
                       )
                     : Text(
-                        'Schedule Post',
+                        widget.isEditing ? 'Update Schedule' : 'Schedule Post',
                         style: GoogleFonts.raleway(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -470,7 +521,7 @@ class _SchedulePickerState extends ConsumerState<SchedulePicker> {
                   ),
                 ),
                 child: Text(
-                  'Publish Now',
+                  widget.isEditing ? 'Update & Publish' : 'Publish Now',
                   style: GoogleFonts.raleway(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

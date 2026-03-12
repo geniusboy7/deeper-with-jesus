@@ -18,7 +18,9 @@ class PostService {
 
   /// Create a new post document in Firestore. Returns the created post.
   Future<DevotionalPost> createPost(DevotionalPost post) async {
-    final docRef = await _postsRef.add(post.toFirestore());
+    final data = post.toFirestore();
+    data['updatedAt'] = Timestamp.fromDate(DateTime.now());
+    final docRef = await _postsRef.add(data);
     final snap = await docRef.get();
     return DevotionalPost.fromFirestore(snap);
   }
@@ -64,7 +66,8 @@ class PostService {
   }
 
   /// Get the published post for a specific date (date-only comparison).
-  /// Returns a stream that emits the post or null.
+  /// If multiple posts exist for the same day, returns the one with the
+  /// latest updatedAt timestamp.
   Stream<DevotionalPost?> watchPostForDate(DateTime date) {
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -74,11 +77,18 @@ class PostService {
         .where('scheduledFor',
             isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .where('scheduledFor', isLessThan: Timestamp.fromDate(endOfDay))
-        .limit(1)
         .snapshots()
         .map((snap) {
       if (snap.docs.isEmpty) return null;
-      return DevotionalPost.fromFirestore(snap.docs.first);
+      final posts =
+          snap.docs.map((d) => DevotionalPost.fromFirestore(d)).toList();
+      // Sort by updatedAt descending — the most recently updated post wins
+      posts.sort((a, b) {
+        final aTime = a.updatedAt ?? a.scheduledFor;
+        final bTime = b.updatedAt ?? b.scheduledFor;
+        return bTime.compareTo(aTime);
+      });
+      return posts.first;
     });
   }
 
@@ -97,9 +107,11 @@ class PostService {
   // Update
   // ---------------------------------------------------------------------------
 
-  /// Update a post document.
+  /// Update a post document. Automatically sets updatedAt to now.
   Future<void> updatePost(DevotionalPost post) async {
-    await _postsRef.doc(post.id).update(post.toFirestore());
+    final data = post.toFirestore();
+    data['updatedAt'] = Timestamp.fromDate(DateTime.now());
+    await _postsRef.doc(post.id).update(data);
   }
 
   /// Publish a post immediately.
