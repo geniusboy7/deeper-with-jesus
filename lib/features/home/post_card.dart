@@ -1,7 +1,13 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/templates.dart';
@@ -126,31 +132,112 @@ class _PostCardState extends ConsumerState<PostCard> {
   }
 
   final GlobalKey _shareButtonKey = GlobalKey();
+  final GlobalKey _templateRepaintKey = GlobalKey();
+  bool _isSharing = false;
 
   Future<void> _handleShare() async {
     final post = widget.post;
-    if (post == null) return;
+    if (post == null || _isSharing) return;
 
-    String shareText;
-    if (post.type == 'template' && post.textContent != null && post.textContent!.isNotEmpty) {
-      shareText = '"${post.textContent!}"';
-    } else if (post.caption != null && post.caption!.isNotEmpty) {
-      shareText = post.caption!;
-    } else {
-      shareText = 'Check out today\'s devotional!';
+    setState(() => _isSharing = true);
+
+    try {
+      // Build caption text for clipboard
+      String caption;
+      if (post.caption != null && post.caption!.isNotEmpty) {
+        caption = post.caption!;
+      } else if (post.textContent != null && post.textContent!.isNotEmpty) {
+        caption = post.textContent!;
+      } else {
+        caption = 'Check out today\'s devotional!';
+      }
+      caption += '\n\n— Deeper with Jesus';
+
+      // Copy caption to clipboard
+      await Clipboard.setData(ClipboardData(text: caption));
+
+      // Get share position origin for iOS
+      Rect? shareOrigin;
+      final renderBox =
+          _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox != null) {
+        final position = renderBox.localToGlobal(Offset.zero);
+        shareOrigin = position & renderBox.size;
+      }
+
+      // Get image file to share
+      File? imageFile;
+      if (post.type == 'uploaded' && post.imageUrl != null) {
+        imageFile = await _downloadImage(post.imageUrl!);
+      } else {
+        imageFile = await _captureTemplateImage();
+      }
+
+      if (imageFile != null) {
+        await Share.shareXFiles(
+          [XFile(imageFile.path)],
+          text: caption,
+          sharePositionOrigin: shareOrigin,
+        );
+      } else {
+        // Fallback to text-only share
+        await Share.share(caption, sharePositionOrigin: shareOrigin);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Caption copied to clipboard', style: GoogleFonts.raleway()),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.primaryLight,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Share error: $e');
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
     }
+  }
 
-    shareText += '\n\n— Deeper with Jesus';
-
-    // On iOS/iPad the share sheet needs an anchor rect for the popover.
-    Rect? shareOrigin;
-    final renderBox = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox != null) {
-      final position = renderBox.localToGlobal(Offset.zero);
-      shareOrigin = position & renderBox.size;
+  Future<File?> _downloadImage(String url) async {
+    try {
+      final httpClient = HttpClient();
+      final request = await httpClient.getUrl(Uri.parse(url));
+      final response = await request.close();
+      final bytes = await response.fold<List<int>>(
+        [],
+        (prev, chunk) => prev..addAll(chunk),
+      );
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/share_devotional.jpg');
+      await file.writeAsBytes(bytes);
+      return file;
+    } catch (e) {
+      debugPrint('Image download error: $e');
+      return null;
     }
+  }
 
-    await Share.share(shareText, sharePositionOrigin: shareOrigin);
+  Future<File?> _captureTemplateImage() async {
+    try {
+      final boundary = _templateRepaintKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/share_devotional.png');
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+      return file;
+    } catch (e) {
+      debugPrint('Template capture error: $e');
+      return null;
+    }
   }
 
   @override
@@ -296,8 +383,10 @@ class _PostCardState extends ConsumerState<PostCard> {
       children: [
         // Gradient area with text content
         Expanded(
-          child: TemplateBackground(
-            template: template,
+          child: RepaintBoundary(
+            key: _templateRepaintKey,
+            child: TemplateBackground(
+              template: template,
             child: SafeArea(
               bottom: false,
               child: Padding(
@@ -339,6 +428,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                 ),
               ),
             ),
+          ),
           ),
         ),
 
