@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>173300136692-bnsdinc0486dcas1be2hqq9n8rv85fei.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.173300136692-bnsdinc0486dcas1be2hqq9n8rv85fei</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCMirGxeAd3g111yfUQKPrg_YvCZG__RzA</string>
+	<key>GCM_SENDER_ID</key>
+	<string>173300136692</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.deeperwithjesus.deeperWithJesus</string>
+	<key>PROJECT_ID</key>
+	<string>deeper-with-jesus</string>
+	<key>STORAGE_BUCKET</key>
+	<string>deeper-with-jesus.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:173300136692:ios:f60cd33b6b452b0018bca1</string>
+</dict>
+</plist>

@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ───────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuth()
+        && exists(/databases/$(database)/documents/admin_emails/$(request.auth.token.email));
+    }
+
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // ── Posts ───────────────────────────────────────────────────────────
+    match /posts/{postId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+
+      // ── Comments subcollection ─────────────────────────────────────
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuth()
+          && request.resource.data.userId == request.auth.uid;
+        allow delete: if isAuth()
+          && (resource.data.userId == request.auth.uid || isAdmin());
+        allow update: if false; // comments are immutable
+      }
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ── Admin Emails ───────────────────────────────────────────────────
+    match /admin_emails/{email} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+  }
+}
