@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,7 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/templates.dart';
 import '../../core/providers/post_provider.dart';
+import '../../shared/widgets/template_background.dart';
 import 'post_card.dart';
 import 'comment_sheet.dart';
 
@@ -111,6 +115,12 @@ class _PostPageForDate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Show patience card for tomorrow (future dates)
+    final today = DateUtils.dateOnly(DateTime.now());
+    if (date.isAfter(today)) {
+      return _PatienceCard(date: date);
+    }
+
     final postAsync = ref.watch(postForDateProvider(date));
 
     return postAsync.when(
@@ -138,6 +148,132 @@ class _PostPageForDate extends ConsumerWidget {
       error: (e, s) => PostCard(
         post: null,
         date: date,
+      ),
+    );
+  }
+}
+
+/// Bible verses about patience shown when swiping to tomorrow.
+const List<Map<String, String>> _patienceVerses = [
+  {
+    'text': 'But if we hope for what we do not yet have, we wait for it patiently.',
+    'reference': 'Romans 8:25',
+  },
+  {
+    'text': 'Be still before the Lord and wait patiently for Him.',
+    'reference': 'Psalm 37:7',
+  },
+  {
+    'text': 'Wait for the Lord; be strong and take heart and wait for the Lord.',
+    'reference': 'Psalm 27:14',
+  },
+  {
+    'text': 'The Lord is good to those who wait for Him, to the soul who seeks Him.',
+    'reference': 'Lamentations 3:25',
+  },
+  {
+    'text': 'Be patient, then, brothers and sisters, until the Lord\'s coming. See how the farmer waits for the land to yield its valuable crop, patiently waiting for the autumn and spring rains.',
+    'reference': 'James 5:7',
+  },
+  {
+    'text': 'But they who wait for the Lord shall renew their strength; they shall mount up with wings like eagles.',
+    'reference': 'Isaiah 40:31',
+  },
+  {
+    'text': 'I wait for the Lord, my whole being waits, and in His word I put my hope.',
+    'reference': 'Psalm 130:5',
+  },
+  {
+    'text': 'The Lord is not slow in keeping His promise, as some understand slowness. Instead He is patient with you.',
+    'reference': '2 Peter 3:9',
+  },
+  {
+    'text': 'Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.',
+    'reference': 'Galatians 6:9',
+  },
+  {
+    'text': 'Be joyful in hope, patient in affliction, faithful in prayer.',
+    'reference': 'Romans 12:12',
+  },
+];
+
+const List<String> _patienceEmojis = ['😊', '🤗', '🫣', '🫶', '🙏', '👀'];
+
+class _PatienceCard extends StatelessWidget {
+  final DateTime date;
+
+  const _PatienceCard({required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    final random = Random(date.millisecondsSinceEpoch);
+    final verse = _patienceVerses[random.nextInt(_patienceVerses.length)];
+    final emoji = _patienceEmojis[random.nextInt(_patienceEmojis.length)];
+    final template = Templates.getTemplateForDate(date);
+
+    return TemplateBackground(
+      template: template,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(flex: 2),
+
+              // Random emoji
+              Text(
+                emoji,
+                style: const TextStyle(fontSize: 48),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Patience message
+              Text(
+                'Tomorrow\'s devotional\nis on its way...',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.raleway(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  height: 1.4,
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Bible verse
+              Text(
+                '"${verse['text']!}"',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.lora(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.white,
+                  height: 1.4,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Reference
+              Text(
+                verse['reference']!,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.raleway(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.7),
+                  letterSpacing: 1.2,
+                ),
+              ),
+
+              const Spacer(flex: 3),
+            ],
+          ),
+        ),
       ),
     );
   }

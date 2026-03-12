@@ -127,7 +127,29 @@ class _CalendarTabState extends ConsumerState<CalendarTab> {
               // Hide default dot markers — we use custom thumbnails
               markersMaxCount: 0,
             ),
+            enabledDayPredicate: (day) {
+              // Disable future days — only today and past are selectable
+              return !_normalizeDate(day)
+                  .isAfter(_normalizeDate(DateTime.now()));
+            },
             calendarBuilders: CalendarBuilders(
+              // Style future (disabled) days with strikethrough
+              disabledBuilder: (context, day, focusedDay) {
+                return Center(
+                  child: Text(
+                    '${day.day}',
+                    style: GoogleFonts.raleway(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textSecondary(context)
+                          .withValues(alpha: 0.4),
+                      decoration: TextDecoration.lineThrough,
+                      decorationColor: AppColors.textSecondary(context)
+                          .withValues(alpha: 0.4),
+                    ),
+                  ),
+                );
+              },
               markerBuilder: (context, date, events) {
                 if (events.isEmpty) return null;
                 final post = events.first;
@@ -138,6 +160,12 @@ class _CalendarTabState extends ConsumerState<CalendarTab> {
               },
             ),
             onDaySelected: (selectedDay, focusedDay) {
+              // Don't open future days
+              if (_normalizeDate(selectedDay)
+                  .isAfter(_normalizeDate(DateTime.now()))) {
+                return;
+              }
+
               setState(() {
                 _selectedDay = selectedDay;
                 _focusedDay = focusedDay;
