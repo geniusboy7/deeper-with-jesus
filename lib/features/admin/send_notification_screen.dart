@@ -1,5 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -14,7 +17,6 @@ class SendNotificationScreen extends StatefulWidget {
 class _SendNotificationScreenState extends State<SendNotificationScreen> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
-  String _audience = 'all'; // 'all' or 'registered'
   bool _isSending = false;
 
   @override
@@ -24,12 +26,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
     super.dispose();
   }
 
-  // TODO: Replace with real Firestore user count.
-  int get _recipientCount {
-    return 0;
-  }
-
-  void _sendNotification() async {
+  Future<void> _sendNotification() async {
     if (_titleController.text.trim().isEmpty) {
       _showSnackBar('Please enter a notification title');
       return;
@@ -41,58 +38,69 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
 
     setState(() => _isSending = true);
 
-    // Simulate sending delay
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('sendCustomNotification')
+          .call({
+        'title': _titleController.text.trim(),
+        'body': _bodyController.text.trim(),
+      });
 
-    if (!mounted) return;
+      if (!mounted) return;
+      setState(() => _isSending = false);
 
-    setState(() => _isSending = false);
+      _titleController.clear();
+      _bodyController.clear();
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        icon: Icon(
-          LucideIcons.checkCircle,
-          color: const Color(0xFF10B981),
-          size: 48,
-        ),
-        title: Text(
-          'Notification Sent!',
-          style: GoogleFonts.lora(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary(context),
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ),
-        content: Text(
-          'Push notification sent to $_recipientCount users.',
-          style: GoogleFonts.raleway(
-            fontSize: 15,
-            color: AppColors.textSecondary(context),
+          icon: Icon(
+            LucideIcons.checkCircle,
+            color: const Color(0xFF10B981),
+            size: 48,
           ),
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Go back to dashboard
-            },
-            child: Text(
-              'Done',
-              style: GoogleFonts.raleway(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary(context),
-              ),
+          title: Text(
+            'Notification Sent!',
+            style: GoogleFonts.lora(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary(context),
             ),
           ),
-        ],
-      ),
-    );
+          content: Text(
+            'Push notification sent to all subscribed users.',
+            style: GoogleFonts.raleway(
+              fontSize: 15,
+              color: AppColors.textSecondary(context),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                'Done',
+                style: GoogleFonts.raleway(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary(context),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSending = false);
+      _showSnackBar('Failed to send notification. Please try again.');
+    }
   }
 
   void _showSnackBar(String message) {
@@ -230,59 +238,6 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Audience section
-          Text(
-            'AUDIENCE',
-            style: GoogleFonts.raleway(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary(context),
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Audience options
-          _AudienceOption(
-            title: 'All users',
-            subtitle: 'Send to all users with notifications enabled',
-            icon: LucideIcons.users,
-            isSelected: _audience == 'all',
-            onTap: () => setState(() => _audience = 'all'),
-          ),
-          const SizedBox(height: 8),
-          _AudienceOption(
-            title: 'Registered users only',
-            subtitle: 'Send to signed-in users only',
-            icon: LucideIcons.userCheck,
-            isSelected: _audience == 'registered',
-            onTap: () => setState(() => _audience = 'registered'),
-          ),
-          const SizedBox(height: 8),
-
-          // Recipient count
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Icon(
-                  LucideIcons.info,
-                  size: 16,
-                  color: AppColors.textSecondary(context),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'This will be sent to $_recipientCount users',
-                  style: GoogleFonts.raleway(
-                    fontSize: 13,
-                    color: AppColors.textSecondary(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
           // Preview section
           Text(
             'PREVIEW',
@@ -357,101 +312,114 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
           ),
           const SizedBox(height: 12),
 
-          // TODO: Replace with real Firestore notification history.
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text(
-                'No notifications sent yet',
-                style: GoogleFonts.raleway(
-                  fontSize: 14,
-                  color: AppColors.textSecondary(context),
-                ),
-              ),
-            ),
+          // Real-time notification history from Firestore
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('notifications')
+                .orderBy('sentAt', descending: true)
+                .limit(10)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
+              final docs = snapshot.data?.docs ?? [];
+              if (docs.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'No notifications sent yet',
+                      style: GoogleFonts.raleway(
+                        fontSize: 14,
+                        color: AppColors.textSecondary(context),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                children: docs.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final title = data['title'] as String? ?? '';
+                  final body = data['body'] as String? ?? '';
+                  final sentAt = (data['sentAt'] as Timestamp?)?.toDate();
+                  final sentBy = data['sentBy'] as String? ?? '';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface(context),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.textSecondary(context)
+                              .withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: GoogleFonts.raleway(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary(context),
+                                  ),
+                                ),
+                              ),
+                              if (sentAt != null)
+                                Text(
+                                  DateFormat.MMMd().add_jm().format(sentAt),
+                                  style: GoogleFonts.raleway(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary(context),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            body,
+                            style: GoogleFonts.raleway(
+                              fontSize: 13,
+                              color: AppColors.textSecondary(context),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Sent by $sentBy',
+                            style: GoogleFonts.raleway(
+                              fontSize: 11,
+                              color: AppColors.textSecondary(context)
+                                  .withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
 
           const SizedBox(height: 24),
         ],
-      ),
-    );
-  }
-}
-
-class _AudienceOption extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _AudienceOption({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary(context).withValues(alpha: 0.08)
-              : AppColors.surface(context),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.primary(context)
-                : AppColors.textSecondary(context).withValues(alpha: 0.2),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected
-                  ? AppColors.primary(context)
-                  : AppColors.textSecondary(context),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.raleway(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary(context),
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.raleway(
-                      fontSize: 12,
-                      color: AppColors.textSecondary(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              color: isSelected
-                  ? AppColors.primary(context)
-                  : AppColors.textSecondary(context),
-              size: 22,
-            ),
-          ],
-        ),
       ),
     );
   }

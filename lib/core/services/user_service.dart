@@ -78,6 +78,11 @@ class UserService {
         );
   }
 
+  /// Update specific fields on the user document by UID.
+  Future<void> updateUserFields(String uid, Map<String, dynamic> fields) async {
+    await _usersRef.doc(uid).update(fields);
+  }
+
   /// Delete the user's Firestore document (used for account deletion).
   Future<void> deleteUser(String uid) async {
     await _usersRef.doc(uid).delete();

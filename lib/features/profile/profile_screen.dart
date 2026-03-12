@@ -7,6 +7,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/notification_provider.dart';
 import '../auth/auth_prompt_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -17,7 +18,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _notificationsEnabled = true;
   String _themeMode = 'System';
 
   String _initials(String displayName) {
@@ -306,14 +306,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ),
             trailing: Switch.adaptive(
-              value: _notificationsEnabled,
+              value: appUser?.notificationsEnabled ?? true,
               activeTrackColor: AppColors.primary(context),
-              onChanged: (value) {
-                setState(() => _notificationsEnabled = value);
-                _showSnackBar(
-                  value ? 'Notifications enabled' : 'Notifications disabled',
-                );
-              },
+              onChanged: isGuest
+                  ? null
+                  : (value) async {
+                      // Persist to Firestore
+                      final userService = ref.read(userServiceProvider);
+                      await userService.updateUserFields(
+                        firebaseUser.uid,
+                        {'notificationsEnabled': value},
+                      );
+                      // Subscribe/unsubscribe from FCM topic
+                      final notifService =
+                          ref.read(notificationServiceProvider);
+                      await notifService.handleTopicSubscription(value);
+                      if (mounted) {
+                        _showSnackBar(
+                          value
+                              ? 'Notifications enabled'
+                              : 'Notifications disabled',
+                        );
+                      }
+                    },
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 4),
           ),

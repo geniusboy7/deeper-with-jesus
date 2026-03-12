@@ -55,6 +55,11 @@ dependencies:
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.6
 
+  # Push notifications
+  firebase_messaging: ^15.2.4
+  flutter_local_notifications: ^18.0.1
+  cloud_functions: ^5.3.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

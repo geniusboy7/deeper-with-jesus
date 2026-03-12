@@ -12,6 +12,7 @@ import 'core/constants/app_theme.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/templates.dart';
 import 'core/providers/auth_provider.dart';
+import 'core/providers/notification_provider.dart';
 import 'features/auth/welcome_screen.dart';
 import 'features/auth/onboarding_screen.dart';
 import 'features/home/home_screen.dart';
@@ -26,6 +27,7 @@ import 'features/admin/comment_moderation_screen.dart';
 import 'features/admin/manage_admins_screen.dart';
 import 'features/admin/manage_topics_screen.dart';
 import 'features/admin/send_notification_screen.dart';
+import 'features/home/post_viewer_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Theme mode provider
@@ -82,7 +84,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   ref.onDispose(() => authNotifier.dispose());
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: '/onboarding',
     refreshListenable: authNotifier,
     redirect: (context, state) {
@@ -193,8 +195,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/admin/notifications',
         builder: (context, state) => const SendNotificationScreen(),
       ),
+      // Deep link route for notification taps
+      GoRoute(
+        path: '/post/:postId',
+        builder: (context, state) {
+          final dateStr = state.uri.queryParameters['date'];
+          final date = dateStr != null
+              ? DateTime.tryParse(dateStr) ?? DateTime.now()
+              : DateTime.now();
+          return PostViewerScreen(initialDate: date);
+        },
+      ),
     ],
   );
+
+  // Attach router to notification service for deep linking
+  final notifService = ref.read(notificationServiceProvider);
+  notifService.setRouter(router);
+
+  return router;
 });
 
 // ---------------------------------------------------------------------------
@@ -208,6 +227,9 @@ class DeeperWithJesusApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final router = ref.watch(routerProvider);
+
+    // Auto-initialize notifications when user signs in
+    ref.watch(notificationInitProvider);
 
     return MaterialApp.router(
       title: 'Deeper with Jesus',
