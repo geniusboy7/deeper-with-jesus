@@ -125,6 +125,8 @@ class _PostCardState extends ConsumerState<PostCard> {
     }
   }
 
+  final GlobalKey _shareButtonKey = GlobalKey();
+
   Future<void> _handleShare() async {
     final post = widget.post;
     if (post == null) return;
@@ -140,7 +142,15 @@ class _PostCardState extends ConsumerState<PostCard> {
 
     shareText += '\n\n— Deeper with Jesus';
 
-    await Share.share(shareText);
+    // On iOS/iPad the share sheet needs an anchor rect for the popover.
+    Rect? shareOrigin;
+    final renderBox = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox != null) {
+      final position = renderBox.localToGlobal(Offset.zero);
+      shareOrigin = position & renderBox.size;
+    }
+
+    await Share.share(shareText, sharePositionOrigin: shareOrigin);
   }
 
   @override
@@ -364,6 +374,7 @@ class _PostCardState extends ConsumerState<PostCard> {
             const Spacer(),
             // Share button
             _ActionButton(
+              key: _shareButtonKey,
               icon: LucideIcons.share2,
               onTap: _handleShare,
             ),
@@ -426,6 +437,7 @@ class _ActionButton extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _ActionButton({
+    super.key,
     required this.icon,
     this.label,
     this.filled = false,
