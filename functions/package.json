@@ -1,8 +1,8 @@
 {
   "name": "deeper-with-jesus-functions",
   "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc --watch",
+    "build": "./node_modules/.bin/tsc",
+    "build:watch": "./node_modules/.bin/tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
@@ -10,7 +10,7 @@
     "logs": "firebase functions:log"
   },
   "engines": {
-    "node": "18"
+    "node": "22"
   },
   "main": "lib/index.js",
   "dependencies": {
