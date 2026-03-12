@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -163,15 +164,10 @@ class _AuthPromptSheetState extends ConsumerState<AuthPromptSheet> {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: _isLoading ? null : _handleGoogleSignIn,
-              icon: Text(
-                'G',
-                style: GoogleFonts.raleway(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimaryLight,
-                ),
+              icon: SvgPicture.asset(
+                'assets/icons/google_logo.svg',
+                width: 20,
+                height: 20,
               ),
               label: Text(
                 'Continue with Google',

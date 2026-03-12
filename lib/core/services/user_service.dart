@@ -24,7 +24,21 @@ class UserService {
     final snapshot = await docRef.get();
 
     if (snapshot.exists) {
-      return AppUser.fromFirestore(snapshot.data()!, firebaseUser.uid);
+      final existingUser = AppUser.fromFirestore(snapshot.data()!, firebaseUser.uid);
+
+      // Re-check admin status on every login in case the email was
+      // added to (or removed from) the admin_emails collection.
+      final email = firebaseUser.email ?? '';
+      if (email.isNotEmpty) {
+        final shouldBeAdmin = await isAdminEmail(email);
+        if (shouldBeAdmin != existingUser.isAdmin) {
+          final newRole = shouldBeAdmin ? 'admin' : 'user';
+          await docRef.update({'role': newRole});
+          return existingUser.copyWith(role: newRole);
+        }
+      }
+
+      return existingUser;
     }
 
     // New user — check if their email qualifies them as admin.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/templates.dart';
 import '../../core/models/devotional_post.dart';
@@ -124,18 +125,22 @@ class _PostCardState extends ConsumerState<PostCard> {
     }
   }
 
-  void _showShareSnackbar() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Share coming soon',
-          style: GoogleFonts.raleway(),
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.primaryLight,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  Future<void> _handleShare() async {
+    final post = widget.post;
+    if (post == null) return;
+
+    String shareText;
+    if (post.type == 'template' && post.textContent != null && post.textContent!.isNotEmpty) {
+      shareText = '"${post.textContent!}"';
+    } else if (post.caption != null && post.caption!.isNotEmpty) {
+      shareText = post.caption!;
+    } else {
+      shareText = 'Check out today\'s devotional!';
+    }
+
+    shareText += '\n\n— Deeper with Jesus';
+
+    await Share.share(shareText);
   }
 
   @override
@@ -360,7 +365,7 @@ class _PostCardState extends ConsumerState<PostCard> {
             // Share button
             _ActionButton(
               icon: LucideIcons.share2,
-              onTap: _showShareSnackbar,
+              onTap: _handleShare,
             ),
           ],
         ),
