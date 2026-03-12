@@ -155,6 +155,7 @@ class AppUser {
   final bool notificationsEnabled;
   final bool isBanned;
   final List<String> fcmTokens;
+  final int appOpens;
 
   const AppUser({
     required this.uid,
@@ -165,6 +166,7 @@ class AppUser {
     this.notificationsEnabled = true,
     this.isBanned = false,
     this.fcmTokens = const [],
+    this.appOpens = 0,
   });
 
   bool get isAdmin => role == 'admin';
@@ -179,6 +181,7 @@ class AppUser {
       notificationsEnabled: data['notificationsEnabled'] as bool? ?? true,
       isBanned: data['isBanned'] as bool? ?? false,
       fcmTokens: List<String>.from(data['fcmTokens'] ?? []),
+      appOpens: data['appOpens'] as int? ?? 0,
     );
   }
 
@@ -191,6 +194,7 @@ class AppUser {
       'notificationsEnabled': notificationsEnabled,
       'isBanned': isBanned,
       'fcmTokens': fcmTokens,
+      'appOpens': appOpens,
     };
   }
 
@@ -203,6 +207,7 @@ class AppUser {
     bool? notificationsEnabled,
     bool? isBanned,
     List<String>? fcmTokens,
+    int? appOpens,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -213,6 +218,7 @@ class AppUser {
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       isBanned: isBanned ?? this.isBanned,
       fcmTokens: fcmTokens ?? this.fcmTokens,
+      appOpens: appOpens ?? this.appOpens,
     );
   }
 }

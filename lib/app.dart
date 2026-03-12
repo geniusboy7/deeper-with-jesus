@@ -13,6 +13,7 @@ import 'core/constants/app_colors.dart';
 import 'core/constants/templates.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/notification_provider.dart';
+import 'core/providers/streak_provider.dart';
 import 'features/auth/welcome_screen.dart';
 import 'features/auth/onboarding_screen.dart';
 import 'features/home/home_screen.dart';
@@ -231,6 +232,9 @@ class DeeperWithJesusApp extends ConsumerWidget {
     // Auto-initialize notifications when user signs in
     ref.watch(notificationInitProvider);
 
+    // Track app opens and fire streak milestone notifications
+    ref.watch(streakInitProvider);
+
     return MaterialApp.router(
       title: 'Deeper with Jesus',
       debugShowCheckedModeBanner: false,
@@ -286,7 +290,7 @@ class _MainShellState extends State<MainShell> {
               tabs: const [
                 NativeGlassNavBarItem(label: 'Home', symbol: 'house.fill'),
                 NativeGlassNavBarItem(label: 'Discover', symbol: 'safari.fill'),
-                NativeGlassNavBarItem(label: 'Profile', symbol: 'person.fill'),
+                NativeGlassNavBarItem(label: 'You', symbol: 'person.fill'),
               ],
               fallback: _buildMaterialNavBar(activeColor, inactiveColor),
             )
@@ -330,7 +334,7 @@ class _MainShellState extends State<MainShell> {
               ),
               _NavItem(
                 icon: LucideIcons.user,
-                label: 'Profile',
+                label: 'You',
                 isActive: _currentIndex == 2,
                 activeColor: activeColor,
                 inactiveColor: inactiveColor,

@@ -154,6 +154,19 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
+
+    // Streaks milestone channel
+    const streaksChannel = AndroidNotificationChannel(
+      'streaks',
+      'Streaks',
+      description: 'Milestone streak notifications',
+      importance: Importance.high,
+    );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(streaksChannel);
   }
 
   void _showForegroundNotification(RemoteMessage message) {
@@ -181,6 +194,33 @@ class NotificationService {
         ),
       ),
       payload: postId,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Streak milestones
+  // ---------------------------------------------------------------------------
+
+  /// Show a local notification when the user hits a streak milestone.
+  Future<void> showStreakMilestone(int count) async {
+    await _localNotifications.show(
+      'streak_$count'.hashCode,
+      'Milestone Reached! 🔥',
+      'You have read $count devotions! Keep going deeper with Jesus',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'streaks',
+          'Streaks',
+          channelDescription: 'Milestone streak notifications',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
     );
   }
 
