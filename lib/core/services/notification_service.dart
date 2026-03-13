@@ -1,5 +1,8 @@
+import 'dart:io' show Platform;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 
@@ -24,17 +27,35 @@ class NotificationService {
     // Request notification permissions (shows system dialog on iOS & Android 13+)
     await _requestPermission();
 
+    // Tell iOS to show notifications even when the app is in the foreground.
+    // Without this, iOS silently swallows FCM messages while the app is open.
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     // Set up local notifications for foreground display
     await _initLocalNotifications();
 
     // On iOS, the APNs token must be available before getToken() or
     // topic subscriptions will silently fail. Wait for it (with timeout).
-    await _waitForApnsToken();
+    if (_isIOS) {
+      await _waitForApnsToken();
+    }
 
     // Get and store FCM token
     final token = await _messaging.getToken();
+
     if (token != null) {
       await _storeFcmToken(userId, token);
+    }
+
+    // Subscribe to new_posts topic (must happen after APNs + FCM are ready)
+    try {
+      await _messaging.subscribeToTopic('new_posts');
+    } catch (e) {
+      debugPrint('[NotificationService] Topic subscription failed: $e');
     }
 
     // Listen for token refreshes
@@ -58,17 +79,28 @@ class NotificationService {
     }
   }
 
+  bool get _isIOS {
+    try {
+      return Platform.isIOS;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// On iOS, APNs token delivery is async. FCM's getToken() and topic
   /// subscriptions silently fail without it. Poll briefly until it arrives.
   Future<void> _waitForApnsToken() async {
-    // Only relevant on iOS — Android doesn't use APNs.
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 15; i++) {
       final apnsToken = await _messaging.getAPNSToken();
-      if (apnsToken != null) return;
+      if (apnsToken != null) {
+        debugPrint('[NotificationService] APNs token received after ${i * 500}ms');
+        return;
+      }
       await Future.delayed(const Duration(milliseconds: 500));
     }
-    // If we still don't have one after 5s, continue anyway — the
+    // If we still don't have one after ~7.5s, continue anyway — the
     // onTokenRefresh listener will pick it up later.
+    debugPrint('[NotificationService] APNs token not received after timeout');
   }
 
   /// Attach the GoRouter instance for deep linking from notification taps.

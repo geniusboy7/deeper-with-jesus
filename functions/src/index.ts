@@ -45,8 +45,16 @@ export const onPostPublished = onDocumentUpdated(
         },
       },
       apns: {
+        headers: {
+          "apns-priority": "10",
+          "apns-push-type": "alert",
+        },
         payload: {
           aps: {
+            alert: {
+              title: "Deeper With Jesus",
+              body: title,
+            },
             sound: "default",
             badge: 1,
           },
@@ -88,8 +96,16 @@ export const onPostCreatedPublished = onDocumentCreated(
         },
       },
       apns: {
+        headers: {
+          "apns-priority": "10",
+          "apns-push-type": "alert",
+        },
         payload: {
           aps: {
+            alert: {
+              title: "Deeper With Jesus",
+              body: title,
+            },
             sound: "default",
             badge: 1,
           },
@@ -146,8 +162,13 @@ export const sendCustomNotification = onCall(async (request) => {
       },
     },
     apns: {
+      headers: {
+        "apns-priority": "10",
+        "apns-push-type": "alert",
+      },
       payload: {
         aps: {
+          alert: { title, body },
           sound: "default",
           badge: 1,
         },
