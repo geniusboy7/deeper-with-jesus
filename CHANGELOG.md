@@ -6,37 +6,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ---
 
-## [Unreleased]
+## [1.0.0] — 2026-03-13 — Initial Release
 
 ### Added
+- **Push notifications (iOS + Android)** — Firebase Cloud Messaging with topic-based delivery
+  - `NotificationService` handles FCM initialization, APNs token management, and topic subscription
+  - iOS: waits for APNs token before FCM operations to prevent silent subscription failures
+  - Topic subscription to `new_posts` with per-user opt-in/out toggle
+  - Foreground notification display via `flutter_local_notifications`
+  - Deep linking from notification tap → `/post/{postId}` with date query parameter
+  - Reading streak milestone local notifications
+- **Cloud Functions** (Firebase, Node.js)
+  - `onPostPublished` — sends topic notification when a post's `isPublished` flips to `true`
+  - `onPostCreatedPublished` — sends topic notification when a post is created already published
+  - `sendCustomNotification` — admin-only HTTPS callable for broadcast notifications
+  - `autoPublishScheduledPosts` — scheduled function (every 30 minutes) to auto-publish posts
+- **Firebase App Check** — app integrity verification to prevent unauthorized API access
+- **FCM token storage** — separate `fcm_tokens` Firestore collection keyed by token string
+- **Notification provider** — `notificationInitProvider` auto-initializes FCM when user signs in
+- **Android release signing** — `key.properties` + `build.gradle.kts` configured for Play Store signing
 - **Comment system** — full Firestore persistence for comments
-  - `PostService.addComment()` writes to `posts/{postId}/comments` subcollection with atomic `commentsCount` increment via batch write
+  - `PostService.addComment()` with atomic `commentsCount` increment via batch write
   - `PostService.watchComments()` streams real-time comments ordered by `createdAt` ascending
-  - `PostService.deleteComment()` deletes comment with atomic `commentsCount` decrement
-  - `commentsProvider` Riverpod family provider keyed by `postId`
-  - `CommentSheet` now streams live comments from Firestore instead of receiving a static list
-  - Loading spinner on send button while comment is being written to Firestore
-  - Error handling with snackbar on failed comment submission
-  - Auth guard: guests see "Sign in to comment" prompt, authenticated users see text input
-- **Firestore security rules for comments** (`firestore.rules`)
-  - Public read on comments subcollection
-  - Authenticated create (must match own `userId`)
-  - Delete by comment author or admin only
-  - Comments are immutable (updates denied)
+  - `PostService.deleteComment()` with atomic `commentsCount` decrement
+  - Auth guard: guests see "Sign in to comment" prompt
+- **Firestore security rules for comments** — public read, authenticated create, author/admin delete
 - **Version-controlled Firestore rules** — `firestore.rules` file added to project root
 
 ### Fixed
-- **RenderFlex overflow on Admin Dashboard** — reduced padding and sizes across `_StatsOverview` and `_QuickActionButton` widgets to recover ~40px of vertical space, eliminating overflow errors on smaller screens
-  - `_StatsOverview` outer padding: `12,8 → 8,4` (top, bottom)
-  - `_StatCard` padding: `12,10 → 8,8` (vertical, horizontal); icon `18 → 16`; value font `20 → 18`
-  - `_QuickActionButton` padding: `12,8 → 10,8` (vertical, horizontal); icon `20 → 18`; label font `12 → 11`
-  - Quick actions section padding: `4,12 → 2,8` (top, bottom)
+- **iOS push notifications not received** — removed `content-available: 1` from APNs alert payload; iOS was treating visible alert notifications as silent background updates and suppressing them
+- **iOS topic subscription timing** — moved `subscribeToTopic('new_posts')` inside `initialize()` after APNs and FCM tokens are confirmed ready, ensuring subscription succeeds on iOS
+- **RenderFlex overflow on Admin Dashboard** — reduced padding and sizes across stats and quick action widgets
 
 ### Changed
-- `CommentSheet` now requires `postId` parameter instead of `List<Comment>` — signature changed from static data to live Firestore stream
-- `home_screen.dart` passes `post.id` to `CommentSheet.show()` instead of `null` comments list
-- `post_viewer_screen.dart` passes `post.id` to `CommentSheet.show()` instead of `null` comments list
-- Updated PRD to reflect Phase 2B status, comments subcollection, security rules, and service methods
+- APNs payload for all Cloud Functions simplified to `alert` + `sound` + `badge` only (removed `content-available` and `mutable-content` flags)
+- `CommentSheet` now requires `postId` parameter for live Firestore streams instead of static list
+- iOS bundle ID: `com.deeperwithjesus.mobile` (registered for App Store)
+- Updated PRD to reflect all completed phases and store submission status
 
 ---
 

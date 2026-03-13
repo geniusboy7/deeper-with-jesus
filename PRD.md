@@ -7,8 +7,8 @@
 | **Product Name** | Deeper with Jesus |
 | **Version** | 1.0.0 |
 | **Platform** | iOS, Android, Web (Flutter) |
-| **Last Updated** | March 12, 2026 |
-| **Status** | Phase 2B In Progress — Comments & Engagement |
+| **Last Updated** | March 13, 2026 |
+| **Status** | Phase 4 Complete — Preparing for App Store & Play Store submission |
 
 ---
 
@@ -63,6 +63,8 @@ A curated one-post-per-day devotional experience where an admin team publishes s
 | `posts/{postId}/comments` | Auto-generated | Comments subcollection per post |
 | `users` | Firebase Auth UID | User profiles and preferences |
 | `admin_emails` | Email address | Admin role whitelist |
+| `fcm_tokens` | FCM token string | Push notification tokens per device |
+| `notifications` | Auto-generated | Log of sent push notifications |
 
 ### 2.4 Firebase Storage Structure
 
@@ -374,6 +376,15 @@ createdAt       DateTime    Timestamp of comment creation
 | `post_images/{imageId}` | Public | Authenticated + size < 10MB + image content type |
 | Everything else | Denied | Denied |
 
+### 7.3 Firebase Cloud Functions
+
+| Function | Trigger | Purpose |
+|---|---|---|
+| `onPostPublished` | Firestore document update (`posts/{postId}`) | Sends FCM topic notification when `isPublished` flips to `true` |
+| `onPostCreatedPublished` | Firestore document create (`posts/{postId}`) | Sends FCM topic notification when a post is created already published |
+| `sendCustomNotification` | HTTPS Callable (admin-only) | Admin broadcast notification to all subscribers via `new_posts` topic |
+| `autoPublishScheduledPosts` | Scheduled (every 30 minutes) | Auto-publishes posts whose `scheduledFor` time has passed |
+
 ### 7.3 Firestore Composite Indexes
 
 | # | Collection | Fields | Status |
@@ -507,7 +518,21 @@ createdAt       DateTime    Timestamp of comment creation
 | `watchComments(String postId)` | Real-time stream of comments ordered by `createdAt` ascending |
 | `deleteComment(postId, commentId)` | Deletes comment + atomically decrements `commentsCount` |
 
-### 10.3 UserService
+### 10.3 NotificationService
+
+| Method | Description |
+|---|---|
+| `initialize(String userId)` | Request permissions, get APNs/FCM tokens, subscribe to `new_posts` topic, set up handlers |
+| `handleTopicSubscription(bool)` | Subscribe/unsubscribe from `new_posts` FCM topic |
+| `setRouter(GoRouter)` | Attach router for deep linking from notification taps |
+| `removeToken(String userId)` | Remove device FCM token on sign-out |
+| `showStreakMilestone(int count)` | Local notification for reading streak milestones |
+
+**iOS-specific**: Waits for APNs token before FCM operations. Foreground notifications displayed via `flutter_local_notifications`.
+
+**Deep linking**: Notification taps navigate to `/post/{postId}` with optional `?date=` query parameter.
+
+### 10.4 UserService
 
 | Method | Description |
 |---|---|
@@ -553,10 +578,12 @@ lib/
 │   ├── services/
 │   │   ├── auth_service.dart          Firebase Auth operations
 │   │   ├── post_service.dart          Post CRUD + image upload
-│   │   └── user_service.dart          User profile management
+│   │   ├── user_service.dart          User profile management
+│   │   └── notification_service.dart  FCM init, topic subscription, deep linking
 │   └── providers/
 │       ├── auth_provider.dart         Auth state + sign-in functions
-│       └── post_provider.dart         Post stream providers
+│       ├── post_provider.dart         Post stream providers
+│       └── notification_provider.dart Auto-init notifications on sign-in
 │
 ├── features/
 │   ├── auth/
@@ -588,6 +615,12 @@ lib/
 └── shared/
     └── widgets/
         └── template_background.dart   Reusable gradient background
+
+functions/
+└── src/
+    └── index.ts                       Cloud Functions (notifications, auto-publish)
+
+firestore.rules                        Firestore security rules (version-controlled)
 ```
 
 ---
@@ -611,9 +644,17 @@ lib/
 | firebase_auth | ^5.6.1 | Authentication |
 | cloud_firestore | ^5.6.5 | Database |
 | firebase_storage | ^12.4.4 | File storage |
+| firebase_messaging | ^15.2.4 | Push notifications (FCM) |
+| flutter_local_notifications | ^18.0.1 | Foreground notification display |
+| cloud_functions | ^5.3.4 | Firebase Cloud Functions client |
+| firebase_app_check | ^0.3.2+10 | App integrity verification |
 | google_sign_in | ^6.2.2 | Google OAuth |
 | sign_in_with_apple | ^7.0.1 | Apple OAuth |
 | crypto | ^3.0.6 | SHA256 for Apple nonce |
+| url_launcher | ^6.3.1 | External link opening |
+| share_plus | ^10.1.4 | Native share sheet |
+| flutter_svg | ^2.1.0 | SVG rendering |
+| path_provider | ^2.1.5 | File system paths |
 
 ### Dev Dependencies
 
@@ -673,44 +714,52 @@ lib/
 
 ---
 
-## 15. Future Roadmap
+## 15. Roadmap & Completion Status
 
-### Phase 2B — Comments & Engagement (In Progress)
-- [x] Implement comment creation and persistence (Firestore subcollection)
-- [x] Real-time comment streams on posts
-- [x] Firestore security rules for comments (public read, auth create, author/admin delete)
-- [x] Atomic comment count tracking (batch writes for `commentsCount`)
-- [ ] Comment moderation workflow (approve/delete/ban user)
-- [ ] View count tracking
-- [ ] Like toggle persistence per user
+### Phase 1 — UI Prototype ✅
+- [x] Full-screen daily post card with horizontal swipe navigation
+- [x] 10 gradient templates, fallback Bible verses
+- [x] Discover screen (Calendar + Topics), Profile, Admin dashboard
+- [x] Create post flow (image upload + template), design system (light/dark)
 
-### Phase 3 — Push Notifications
-- [ ] Firebase Cloud Messaging (FCM) integration
-- [ ] Daily new-post notifications
-- [ ] Admin broadcast notifications
-- [ ] Notification preferences (per-user opt-in/out)
-- [ ] Deep linking from notification → specific post
+### Phase 2A — Firebase + Authentication ✅
+- [x] Firebase Core, Firestore, Auth, Storage integration
+- [x] Google Sign-In, Apple Sign-In (iOS), Guest mode
+- [x] Auth-aware routing with Riverpod providers
+- [x] Firestore security rules, composite indexes
 
-### Phase 4 — Content Enhancements
-- [ ] Rich text editor for template posts (bold, italic, line breaks)
-- [ ] Video post support
-- [ ] Audio devotional playback
-- [ ] Multi-image carousel posts
-- [ ] Custom template creation by admins
+### Phase 2B — Comments & Engagement ✅
+- [x] Comment creation/deletion with Firestore subcollection
+- [x] Real-time comment streams, atomic comment count tracking
+- [x] Comment moderation workflow (admin approve/delete)
+- [x] Like toggle persistence per user
 
-### Phase 5 — Community & Social
+### Phase 3 — Push Notifications ✅
+- [x] Firebase Cloud Messaging (FCM) integration (iOS + Android)
+- [x] APNs token handling for iOS with wait-for-token pattern
+- [x] Topic-based notifications (`new_posts` topic)
+- [x] Admin broadcast notifications via Cloud Functions
+- [x] Notification preferences (per-user opt-in/out)
+- [x] Deep linking from notification → specific post
+- [x] Reading streak milestone local notifications
+- [x] Firebase App Check for app integrity
+
+### Phase 4 — Store Submission (In Progress)
+- [x] iOS bundle ID registered (`com.deeperwithjesus.mobile`)
+- [x] Android release signing configuration
+- [x] App Store metadata prepared
+- [x] Play Store metadata prepared
+- [ ] iOS App Store submission
+- [ ] Google Play Store submission
+
+### Future Phases
+- [ ] Rich text editor for template posts
+- [ ] Video/audio devotional support
 - [ ] User bookmarks / saved posts
-- [ ] Reading streaks and habit tracking
-- [ ] Share to Instagram Stories / social media
+- [ ] Share to social media (Instagram Stories, etc.)
 - [ ] Community prayer wall
-- [ ] User-submitted prayer requests
-
-### Phase 6 — Monetization & Growth
-- [ ] Premium subscription tier (RevenueCat)
-- [ ] Exclusive content for subscribers
-- [ ] Offline mode (cached posts)
 - [ ] Multi-language support
-- [ ] App Store Optimization (ASO)
+- [ ] Offline mode (cached posts)
 
 ---
 
@@ -752,33 +801,37 @@ lib/
 ## 17. Release Checklist
 
 ### Pre-Release
-- [ ] `flutter analyze` — 0 issues
-- [ ] All Firestore composite indexes enabled
-- [ ] Firestore security rules published (production)
-- [ ] Storage security rules published (production)
-- [ ] Admin email seeded in `admin_emails` collection
-- [ ] Firebase Auth providers enabled (Google, Apple)
-- [ ] App icon generated via flutter_launcher_icons
-- [ ] Privacy Policy URL configured
-- [ ] Terms of Service URL configured
+- [x] `flutter analyze` — 0 issues
+- [x] All Firestore composite indexes enabled
+- [x] Firestore security rules published (production)
+- [x] Storage security rules published (production)
+- [x] Admin email seeded in `admin_emails` collection
+- [x] Firebase Auth providers enabled (Google, Apple)
+- [x] App icon generated via flutter_launcher_icons
+- [x] Privacy Policy URL configured (`https://www.geniustechhub.com/privacy-policy`)
+- [x] Cloud Functions deployed (notifications, auto-publish)
+- [x] APNs Authentication Key uploaded in Firebase Console
+- [x] Firebase App Check enabled
 
 ### iOS Submission
-- [ ] Bundle ID registered in Apple Developer Portal
+- [x] Bundle ID registered (`com.deeperwithjesus.mobile`)
 - [ ] App Store Connect listing created
-- [ ] Screenshots captured (6.7", 6.1", iPad)
+- [ ] Screenshots captured (6.7", 6.5")
 - [ ] App Privacy details filled
-- [ ] Sign in with Apple entitlement enabled
-- [ ] `ios/Runner.xcworkspace` builds and runs cleanly
+- [x] Sign in with Apple entitlement enabled
+- [ ] `ios/Runner.xcworkspace` archive builds cleanly
 - [ ] TestFlight build uploaded and tested
+- [ ] App Review submission
 
 ### Android Submission
-- [ ] Package name registered in Google Play Console
-- [ ] Signing key generated and configured
+- [x] Package name: `com.deeperwithjesus.deeper_with_jesus`
+- [x] Release signing key configured (`key.properties` + `build.gradle.kts`)
 - [ ] Play Store listing created
 - [ ] Feature graphic + screenshots uploaded
 - [ ] Data safety form completed
 - [ ] AAB bundle built and uploaded
 - [ ] Internal testing track verified
+- [ ] Production release submission
 
 ---
 
